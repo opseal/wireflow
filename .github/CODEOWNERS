@@ -1,0 +1,37 @@
+# Global code owners
+* @vpn-devops/core-team
+
+# Core infrastructure
+/infrastructure/ @vpn-devops/infrastructure-team
+/helm/ @vpn-devops/infrastructure-team
+/scripts/ @vpn-devops/infrastructure-team
+
+# Application code
+/src/ @vpn-devops/backend-team
+/docker/ @vpn-devops/backend-team
+
+# Kubernetes manifests
+/k8s/ @vpn-devops/platform-team
+/security/ @vpn-devops/security-team
+
+# Monitoring and observability
+/monitoring/ @vpn-devops/observability-team
+
+# Documentation
+/docs/ @vpn-devops/docs-team
+*.md @vpn-devops/docs-team
+
+# CI/CD and workflows
+/.github/ @vpn-devops/platform-team
+
+# Configuration files
+*.yml @vpn-devops/platform-team
+*.yaml @vpn-devops/platform-team
+*.json @vpn-devops/platform-team
+*.toml @vpn-devops/platform-team
+
+
+
+
+
+

@@ -1,0 +1,61 @@
+# Pod Security Policy for VPN Infrastructure
+
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: vpn-psp
+  namespace: vpn-system
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_ADMIN
+    - SYS_MODULE
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpn-psp-user
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - vpn-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpn-psp-user
+roleRef:
+  kind: ClusterRole
+  name: vpn-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: vpn-wireguard
+  namespace: vpn-system
+- kind: ServiceAccount
+  name: vpn-api
+  namespace: vpn-system
+
+
+
+
+
+

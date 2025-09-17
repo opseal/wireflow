@@ -1,0 +1,165 @@
+version: '3.8'
+
+services:
+  # WireGuard VPN Server
+  wireguard:
+    build:
+      context: ./docker/wireguard
+      dockerfile: Dockerfile
+    container_name: wireflow-wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - ./data/wireguard:/etc/wireguard
+      - ./data/keys:/etc/wireguard/keys
+    ports:
+      - "51820:51820/udp"
+    environment:
+      - WG_HOST=${WG_HOST:-localhost}
+      - WG_PORT=51820
+      - WG_DEFAULT_ADDRESS=10.0.0.1
+      - WG_DEFAULT_DNS=8.8.8.8
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # HAProxy Load Balancer
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: wireflow-haproxy
+    volumes:
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "8081:80"
+      - "8443:443"
+      - "8404:8404"  # HAProxy stats
+    depends_on:
+      - wireguard
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: wireflow-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: wireflow-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # ELK Stack for Logging
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: wireflow-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: wireflow-logstash
+    volumes:
+      - ./monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: wireflow-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5602:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # WireFlow VPN Management API
+  vpn-api:
+    build:
+      context: ./src/api
+      dockerfile: Dockerfile
+    container_name: wireflow-api
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=sqlite:///app/vpn.db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: wireflow-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - wireflow-network
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+  redis_data:
+
+networks:
+  wireflow-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+

@@ -1,0 +1,150 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "VPN Monitoring Dashboard",
+    "tags": ["vpn", "wireguard", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "VPN Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "wireguard_peers_connected",
+            "legendFormat": "Connected Peers"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "green",
+                  "value": 10
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "VPN Traffic (Bytes/sec)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(wireguard_bytes_received[5m])",
+            "legendFormat": "Received"
+          },
+          {
+            "expr": "rate(wireguard_bytes_sent[5m])",
+            "legendFormat": "Sent"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Bytes/sec",
+            "logBase": 1,
+            "max": null,
+            "min": "0",
+            "show": true
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "System Resources",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100)",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "logBase": 1,
+            "max": "100",
+            "min": "0",
+            "show": true
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "VPN Handshakes",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "wireguard_handshake_timestamp_seconds",
+            "legendFormat": "Last Handshake"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Timestamp",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}
+
+
+
+
+
+

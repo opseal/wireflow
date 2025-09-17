@@ -1,0 +1,29 @@
+apiVersion: v2
+name: wireflow-vpn
+description: WireFlow VPN - Seamless Secure Connections. A comprehensive VPN solution with WireGuard, management API, and monitoring
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/wireflow/vpn
+sources:
+  - https://github.com/wireflow/vpn
+maintainers:
+  - name: WireFlow Team
+    email: team@wireflow.com
+keywords:
+  - vpn
+  - wireguard
+  - networking
+  - security
+  - devops
+  - kubernetes
+  - wireflow
+annotations:
+  category: Networking
+  licenses: MIT
+
+
+
+
+
+

@@ -1,0 +1,407 @@
+# Default values for WireFlow VPN
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# WireFlow VPN WireGuard configuration
+wireguard:
+  enabled: true
+  image:
+    repository: wireflow-wireguard
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  service:
+    type: LoadBalancer
+    port: 51820
+    protocol: UDP
+  
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  
+  # WireGuard specific configuration
+  config:
+    interface: "wg0"
+    address: "10.0.0.1/24"
+    port: 51820
+    dns: "8.8.8.8"
+    allowedIPs: "0.0.0.0/0"
+  
+  # Security context
+  securityContext:
+    capabilities:
+      add:
+        - NET_ADMIN
+        - SYS_MODULE
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+# WireFlow VPN API configuration
+api:
+  enabled: true
+  image:
+    repository: wireflow-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 3
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    limits:
+      cpu: 300m
+      memory: 512Mi
+    requests:
+      cpu: 150m
+      memory: 256Mi
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  
+  # API configuration
+  config:
+    jwtSecret: "your-jwt-secret-change-this"
+    databaseUrl: "sqlite:///app/vpn.db"
+    redisUrl: "redis://redis:6379"
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# Load Balancer (HAProxy) configuration
+haproxy:
+  enabled: true
+  image:
+    repository: haproxy
+    tag: "2.8-alpine"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  service:
+    type: LoadBalancer
+    ports:
+      http: 80
+      https: 443
+      wireguard: 51820
+      stats: 8404
+  
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  service:
+    type: ClusterIP
+    port: 6379
+  
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    image:
+      repository: prom/prometheus
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 9090
+    
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+    
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    
+    retention: "200h"
+  
+  # Grafana
+  grafana:
+    enabled: true
+    image:
+      repository: grafana/grafana
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 3000
+    
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: ""
+    
+    adminPassword: "admin123"
+    
+    # Grafana dashboards
+    dashboards:
+      vpn-dashboard: true
+      system-dashboard: true
+      security-dashboard: true
+  
+  # ELK Stack
+  elasticsearch:
+    enabled: true
+    image:
+      repository: docker.elastic.co/elasticsearch/elasticsearch
+      tag: "8.11.0"
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 9200
+    
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+    
+    # Elasticsearch configuration
+    config:
+      discovery.type: "single-node"
+      xpack.security.enabled: false
+      "ES_JAVA_OPTS": "-Xms512m -Xmx512m"
+  
+  logstash:
+    enabled: true
+    image:
+      repository: docker.elastic.co/logstash/logstash
+      tag: "8.11.0"
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 5044
+    
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+  
+  kibana:
+    enabled: true
+    image:
+      repository: docker.elastic.co/kibana/kibana
+      tag: "8.11.0"
+      pullPolicy: IfNotPresent
+    
+    service:
+      type: ClusterIP
+      port: 5601
+    
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Security configuration
+security:
+  # Network policies
+  networkPolicies:
+    enabled: true
+  
+  # Pod security policies
+  podSecurityPolicies:
+    enabled: true
+  
+  # RBAC
+  rbac:
+    enabled: true
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: vpn.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storage:
+    size: 10Gi
+    storageClass: ""
+
+# Environment variables
+env:
+  # Global environment variables
+  global:
+    TZ: "UTC"
+    LOG_LEVEL: "INFO"
+  
+  # WireGuard environment variables
+  wireguard:
+    WG_HOST: ""
+    WG_PORT: "51820"
+    WG_DEFAULT_ADDRESS: "10.0.0.1"
+    WG_DEFAULT_DNS: "8.8.8.8"
+  
+  # API environment variables
+  api:
+    DATABASE_URL: "sqlite:///app/vpn.db"
+    REDIS_URL: "redis://redis:6379"
+    JWT_SECRET: "your-secret-key-change-this"
+    LOG_LEVEL: "INFO"
+  
+  # Monitoring environment variables
+  monitoring:
+    PROMETHEUS_RETENTION: "200h"
+    GRAFANA_ADMIN_PASSWORD: "admin123"
+    ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+
+# Service accounts
+serviceAccounts:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Horizontal Pod Autoscaler
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+
+
+
+
+

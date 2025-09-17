@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpn-wireguard
+  namespace: vpn-system
+  labels:
+    app: vpn-wireguard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vpn-wireguard
+  template:
+    metadata:
+      labels:
+        app: vpn-wireguard
+    spec:
+      containers:
+      - name: wireguard
+        image: vpn-wireguard:latest
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - SYS_MODULE
+        env:
+        - name: WG_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: WG_PORT
+          value: "51820"
+        - name: WG_DEFAULT_ADDRESS
+          value: "10.0.0.1"
+        - name: WG_DEFAULT_DNS
+          value: "8.8.8.8"
+        ports:
+        - containerPort: 51820
+          protocol: UDP
+        volumeMounts:
+        - name: wireguard-config
+          mountPath: /etc/wireguard
+        - name: wireguard-keys
+          mountPath: /etc/wireguard/keys
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          exec:
+            command:
+            - wg
+            - show
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - wg
+            - show
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: wireguard-config
+        configMap:
+          name: vpn-config
+      - name: wireguard-keys
+        secret:
+          secretName: vpn-secrets
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+
+
+
+
+
+

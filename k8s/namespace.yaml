@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vpn-system
+  labels:
+    name: vpn-system
+    app.kubernetes.io/name: vpn
+    app.kubernetes.io/instance: vpn-system
+

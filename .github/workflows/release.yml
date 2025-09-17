@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        pip install bump2version
+        npm install -g @semantic-release/changelog
+        npm install -g @semantic-release/git
+
+    - name: Configure Git
+      run: |
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Extract version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+    - name: Update version in files
+      run: |
+        # Update version in Chart.yaml
+        sed -i "s/^version: .*/version: ${VERSION#v}/" helm/vpn/Chart.yaml
+        sed -i "s/^appVersion: .*/appVersion: \"${VERSION#v}\"/" helm/vpn/Chart.yaml
+        
+        # Update version in package.json (if exists)
+        if [ -f package.json ]; then
+          npm version ${VERSION#v} --no-git-tag-version
+        fi
+        
+        # Update version in Python files
+        find src/ -name "*.py" -exec sed -i "s/__version__ = .*/__version__ = \"${VERSION#v}\"/" {} \;
+
+    - name: Build Docker images
+      run: |
+        # Build WireGuard image
+        docker build -t vpn-devops/wireguard:${VERSION#v} ./docker/wireguard/
+        docker build -t vpn-devops/wireguard:latest ./docker/wireguard/
+        
+        # Build API image
+        docker build -t vpn-devops/api:${VERSION#v} ./src/api/
+        docker build -t vpn-devops/api:latest ./src/api/
+
+    - name: Push Docker images
+      run: |
+        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        
+        # Push WireGuard images
+        docker push vpn-devops/wireguard:${VERSION#v}
+        docker push vpn-devops/wireguard:latest
+        
+        # Push API images
+        docker push vpn-devops/api:${VERSION#v}
+        docker push vpn-devops/api:latest
+
+    - name: Create Helm package
+      run: |
+        helm package helm/vpn --destination ./dist/
+        helm repo index ./dist/ --url https://vpn-devops.github.io/helm-charts/
+
+    - name: Upload Helm charts
+      uses: actions/upload-artifact@v3
+      with:
+        name: helm-charts
+        path: ./dist/
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.VERSION }}
+        release_name: Release ${{ env.VERSION }}
+        body: |
+          ## What's Changed
+          
+          ### New Features
+          - Add new VPN client management features
+          - Improve monitoring and observability
+          - Enhanced security policies
+          
+          ### Bug Fixes
+          - Fix VPN connection issues
+          - Resolve monitoring dashboard problems
+          - Security vulnerability patches
+          
+          ### Improvements
+          - Performance optimizations
+          - Documentation updates
+          - CI/CD pipeline improvements
+          
+          ## Installation
+          
+          ### Using Helm
+          ```bash
+          helm repo add vpn-devops https://vpn-devops.github.io/helm-charts
+          helm repo update
+          helm install vpn vpn-devops/vpn --version ${VERSION#v}
+          ```
+          
+          ### Using Docker
+          ```bash
+          docker run -d vpn-devops/wireguard:${VERSION#v}
+          docker run -d vpn-devops/api:${VERSION#v}
+          ```
+          
+          ### Using Scripts
+          ```bash
+          ./scripts/deploy-cloud.sh --cloud aws --region us-west-2
+          ```
+          
+          ## Full Changelog
+          See the [full changelog](https://github.com/vpn-devops/vpn-devops/compare/${{ github.event.before }}...${{ env.VERSION }}) for all changes.
+        draft: false
+        prerelease: false
+
+    - name: Update Helm repository
+      run: |
+        git clone https://github.com/vpn-devops/helm-charts.git
+        cp ./dist/* helm-charts/
+        cd helm-charts
+        git add .
+        git commit -m "Update charts for ${{ env.VERSION }}"
+        git push https://${{ secrets.GITHUB_TOKEN }}@github.com/vpn-devops/helm-charts.git
+
+    - name: Notify community
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#releases'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+      if: always()
+
+
+

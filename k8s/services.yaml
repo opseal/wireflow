@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpn-wireguard-service
+  namespace: vpn-system
+  labels:
+    app: vpn-wireguard
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 51820
+    targetPort: 51820
+    protocol: UDP
+    name: wireguard
+  selector:
+    app: vpn-wireguard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpn-api-service
+  namespace: vpn-system
+  labels:
+    app: vpn-api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: vpn-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpn-haproxy-service
+  namespace: vpn-system
+  labels:
+    app: vpn-haproxy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+  - port: 51820
+    targetPort: 51820
+    protocol: UDP
+    name: wireguard
+  - port: 8404
+    targetPort: 8404
+    protocol: TCP
+    name: stats
+  selector:
+    app: vpn-haproxy
+
+
+
+
+
+

@@ -1,0 +1,129 @@
+# Kubernetes Network Security Policies for VPN Infrastructure
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpn-system-network-policy
+  namespace: vpn-system
+spec:
+  podSelector:
+    matchLabels:
+      app: vpn-wireguard
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vpn-api
+    ports:
+    - protocol: UDP
+      port: 51820
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vpn-haproxy
+    ports:
+    - protocol: UDP
+      port: 51820
+  egress:
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpn-api-network-policy
+  namespace: vpn-system
+spec:
+  podSelector:
+    matchLabels:
+      app: vpn-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vpn-haproxy
+    ports:
+    - protocol: TCP
+      port: 8080
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpn-haproxy-network-policy
+  namespace: vpn-system
+spec:
+  podSelector:
+    matchLabels:
+      app: vpn-haproxy
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: UDP
+      port: 51820
+    - protocol: TCP
+      port: 8404
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: vpn-wireguard
+    ports:
+    - protocol: UDP
+      port: 51820
+  - to:
+    - podSelector:
+        matchLabels:
+          app: vpn-api
+    ports:
+    - protocol: TCP
+      port: 8080
+
+
+
+
+
+
